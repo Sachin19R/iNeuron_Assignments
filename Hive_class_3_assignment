@@ -1,0 +1,372 @@
+1. Download vechile sales data -> https://github.com/shashank-mishra219/Hive-Class/blob/main/sales_order_data.csv
+
+2. Store raw data into hdfs location
+
+---->  hdfs dfs -put data/sales_order_data.csv /tmp/hive_data
+
+3. Create a internal hive table "sales_order_csv" which will store csv data sales_order_csv .. make sure to skip header row while creating table
+
+----> hive> create table sales_order_csv
+          > (
+          > ORDERNUMBER int,
+          > QUANTITYORDERED int,
+          > PRICEEACH float,
+          > ORDERLINENUMBER int,
+          > SALES float,
+          > STATUS string,
+          > QTR_ID int,
+          > MONTH_ID int,
+          > YEAR_ID int,
+          > PRODUCTLINE string,
+          > MSRP int,
+          > PRODUCTCODE string,
+          > PHONE string,
+          > CITY string,
+          > STATE string,
+          > POSTALCODE string,
+          > COUNTRY string,
+          > TERRITORY string,
+          > CONTACTLASTNAME string,
+          > CONTACTFIRSTNAME string,
+          > DEALSIZE string
+          > )
+          > row format delimited
+          > fields terminated by ','
+          > tblproperties("skip.header.line.count" = "1")
+          > ;
+      OK
+      Time taken: 0.768 seconds
+
+
+4. Load data from hdfs path into "sales_order_csv" 
+
+----> hive> load data inpath '/tmp/hive_data/sales_order_data.csv' into table sales_order_csv;
+      Loading data to table default.sales_order_csv
+      Table default.sales_order_csv stats: [numFiles=1, totalSize=360233]
+      OK
+      Time taken: 0.744 seconds
+
+
+5. Create an internal hive table which will store data in ORC format "sales_order_orc"
+
+----> hive> create table sales_order_orc
+          > (
+          > ORDERNUMBER int,
+          > QUANTITYORDERED int,
+          > PRICEEACH float,
+          > ORDERLINENUMBER int,
+          > SALES float,
+          > STATUS string,
+          > QTR_ID int,
+          > MONTH_ID int,
+          > YEAR_ID int,
+          > PRODUCTLINE string,
+          > MSRP int,
+          > PRODUCTCODE string,
+          > PHONE string,
+          > CITY string,
+          > STATE string,
+          > POSTALCODE string,
+          > COUNTRY string,
+          > TERRITORY string,
+          > CONTACTLASTNAME string,
+          > CONTACTFIRSTNAME string,
+          > DEALSIZE string
+          > )
+          > stored as orc;
+      OK
+      Time taken: 0.614 seconds
+
+
+6. Load data from "sales_order_csv" into "sales_order_orc"
+
+--->hive> insert overwrite table sales_order_orc select * from sales_order_csv;
+        Query ID = cloudera_20220916063838_4514e4fe-e381-4276-99b4-3ca7b7faeba4
+        Total jobs = 1
+        Launching Job 1 out of 1
+        Number of reduce tasks is set to 0 since there's no reduce operator
+        Starting Job = job_1663329334341_0003, Tracking URL = http://quickstart.cloudera:8088/proxy/application_1663329334341_0003/
+        Kill Command = /usr/lib/hadoop/bin/hadoop job  -kill job_1663329334341_0003
+        Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 0
+        2022-09-16 06:38:35,810 Stage-1 map = 0%,  reduce = 0%
+        2022-09-16 06:38:43,241 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 2.71 sec
+        MapReduce Total cumulative CPU time: 2 seconds 710 msec
+        Ended Job = job_1663329334341_0003
+        Stage-4 is selected by condition resolver.
+        Stage-3 is filtered out by condition resolver.
+        Stage-5 is filtered out by condition resolver.
+        Moving data to: hdfs://quickstart.cloudera:8020/user/hive/warehouse/sales_order_orc/.hive-staging_hive_2022-09-16_06-38-27_772_3096047239866995580-1/-ext-10000
+        Loading data to table default.sales_order_orc
+        Table default.sales_order_orc stats: [numFiles=1, numRows=2823, totalSize=37548, rawDataSize=3153291]
+        MapReduce Jobs Launched:
+        Stage-Stage-1: Map: 1   Cumulative CPU: 2.71 sec   HDFS Read: 367384 HDFS Write: 37634 SUCCESS
+        Total MapReduce CPU Time Spent: 2 seconds 710 msec
+        OK
+        Time taken: 17.085 seconds
+
+
+
+Perform below menioned queries on "sales_order_orc" table :
+
+a. Calculatye total sales per year
+
+        hive> select year_id,cast(sum(sales) as int) as total_sales
+            > from sales_order_orc
+            > group by year_id ;
+
+        year_id total_sales
+        2003    3516979
+        2004    4724162
+        2005    1791486
+        Time taken: 23.509 seconds, Fetched: 3 row(s)
+
+b. Find a product for which maximum orders were placed
+
+          hive> select productcode as product_code, sum(quantityordered) as total_quantity
+              > from sales_order_orc
+              > group  by productcode
+              > order by total_quantity desc
+              > limit 1;
+
+          product_code     total_quantity
+          S18_3232        1774
+          Time taken: 44.982 seconds, Fetched: 1 row(s)
+
+c. Calculate the total sales for each quarter
+
+        hive> select year_id as year,
+            > qtr_id as quarter,
+            > cast(sum(sales) as int) as total_sales
+            > from sales_order_orc
+            > group by year_id,qtr_id;
+
+            year    quarter total_sales
+            2003    1       445094
+            2003    2       562365
+            2003    3       649514
+            2003    4       1860005
+            2004    1       833730
+            2004    2       766260
+            2004    3       1109396
+            2004    4       2014774
+            2005    1       1071992
+            2005    2       719494
+            Time taken: 29.568 seconds, Fetched: 10 row(s)
+
+
+
+d. In which quarter sales was minimum
+
+          hive> select year_id as year,
+              > qtr_id as quarter,
+              > cast(sum(sales) as int) as total_sales
+              > from sales_order_orc
+              > group by year_id,qtr_id
+              > order by total_quantity
+              > limit 1;
+
+              year    quarter total_sales
+              2003    1       445094
+              Time taken: 61.945 seconds, Fetched: 1 row(s)
+
+
+
+e. In which country sales was maximum and in which country sales was minimum
+
+
+f. Calculate quartelry sales for each city
+                  hive> select city,
+                      > qtr_id as quarter,
+                      > cast(sum(sales) as int) as total_sales
+                      > from sales_order_orc
+                      > group by city,qtr_id;
+
+                  city    quarter total_sales
+                  Aaarhus 4       100595
+                  Allentown       2       6166
+                  Allentown       3       71930
+                  Allentown       4       44040
+                  Barcelona       2       4219
+                  Barcelona       4       74192
+                  Bergamo 1       56181
+                  Bergamo 4       81774
+                  Bergen  3       16363
+                  Bergen  4       95277
+                  Boras   1       31606
+                  Boras   3       53941
+                  Boras   4       48710
+                  Boston  2       74994
+                  Boston  3       15344
+                  Boston  4       63730
+                  Brickhaven      1       31474
+                  Brickhaven      2       7277
+                  Brickhaven      3       114974
+                  Brickhaven      4       11528
+                  Bridgewater     2       75778
+                  Bridgewater     4       26115
+                  Brisbane        1       16118
+                  Brisbane        3       34100
+                  Bruxelles       1       18800
+                  Bruxelles       2       8411
+                  Bruxelles       3       47760
+                  Burbank 1       37850
+                  Burbank 4       8234
+                  Burlingame      1       13529
+                  Burlingame      3       42031
+                  Burlingame      4       65221
+                  Cambridge       1       21782
+                  Cambridge       2       14380
+                  Cambridge       3       48828
+                  Cambridge       4       54251
+                  Charleroi       1       16628
+                  Charleroi       2       1711
+                  Charleroi       3       1637
+                  Charleroi       4       13463
+                  Chatswood       2       43971
+                  Chatswood       3       69694
+                  Chatswood       4       37905
+                  Cowes   1       26906
+                  Cowes   4       51334
+                  Dublin  1       38784
+                  Dublin  3       18971
+                  Espoo   1       51373
+                  Espoo   2       31018
+                  Espoo   3       31569
+                  Frankfurt       1       48698
+                  Frankfurt       4       36472
+                  Gensve  1       50432
+                  Gensve  3       67281
+                  Glen Waverly    2       14378
+                  Glen Waverly    3       12334
+                  Glen Waverly    4       37878
+                  Glendale        1       3987
+                  Glendale        2       20350
+                  Glendale        3       7600
+                  Glendale        4       34485
+                  Graz    1       8775
+                  Graz    4       43488
+                  Helsinki        1       26422
+                  Helsinki        3       42744
+                  Helsinki        4       42083
+                  Kobenhavn       1       58871
+                  Kobenhavn       2       62091
+                  Kobenhavn       4       24078
+                  Koln    4       100306
+                  Las Vegas       2       33847
+                  Las Vegas       3       34453
+                  Las Vegas       4       14449
+                  Lille   1       20178
+                  Lille   4       48874
+                  Liverpool       2       91211
+                  Liverpool       4       26797
+                  London  1       8477
+                  London  2       32376
+                  London  4       83970
+                  Los Angeles     1       23889
+                  Los Angeles     4       24159
+                  Lule    1       9748
+                  Lule    4       66005
+                  Lyon    1       101339
+                  Lyon    4       41535
+                  Madrid  1       357668
+                  Madrid  2       339588
+                  Madrid  3       69714
+                  Madrid  4       315580
+                  Makati City     1       55245
+                  Makati City     4       38770
+                  Manchester      1       51017
+                  Manchester      4       106789
+                  Marseille       1       2317
+                  Marseille       2       52481
+                  Marseille       4       20136
+                  Melbourne       1       49637
+                  Melbourne       2       60135
+                  Melbourne       4       91221
+                  Minato-ku       1       38191
+                  Minato-ku       2       26482
+                  Minato-ku       4       55888
+                  Montreal        2       58257
+                  Montreal        4       15947
+                  Munich  3       34993
+                  NYC     1       32647
+                  NYC     2       165100
+                  NYC     3       63027
+                  NYC     4       300011
+                  Nantes  1       59617
+                  Nantes  2       60344
+                  Nantes  3       61310
+                  Nantes  4       23031
+                  Nashua  1       12133
+                  Nashua  4       119552
+                  New Bedford     1       48578
+                  New Bedford     3       45738
+                  New Bedford     4       113557
+                  New Haven       2       36973
+                  New Haven       4       42498
+                  Newark  1       8722
+                  Newark  2       74506
+                  North Sydney    1       65012
+                  North Sydney    3       47191
+                  North Sydney    4       41791
+                  Osaka   1       50490
+                  Osaka   2       17114
+                  Oslo    3       34145
+                  Oslo    4       45078
+                  Oulu    1       49055
+                  Oulu    2       17813
+                  Oulu    3       37501
+                  Paris   1       71494
+                  Paris   2       80215
+                  Paris   3       27798
+                  Paris   4       89436
+                  Pasadena        1       44273
+                  Pasadena        3       55776
+                  Pasadena        4       4512
+                  Philadelphia    1       27398
+                  Philadelphia    2       7287
+                  Philadelphia    4       116503
+                  Reggio Emilia   2       41509
+                  Reggio Emilia   3       56421
+                  Reggio Emilia   4       44669
+                  Reims   1       52029
+                  Reims   2       18971
+                  Reims   3       15146
+                  Reims   4       48895
+                  Salzburg        2       98104
+                  Salzburg        3       6693
+                  Salzburg        4       45001
+                  San Diego       1       87489
+                  San Francisco   1       72899
+                  San Francisco   4       151459
+                  San Jose        2       160010
+                  San Rafael      1       267315
+                  San Rafael      2       7261
+                  San Rafael      3       216297
+                  San Rafael      4       163983
+                  Sevilla 4       54723
+                  Singapore       1       28395
+                  Singapore       2       92033
+                  Singapore       3       90250
+                  Singapore       4       77809
+                  South Brisbane  1       21730
+                  South Brisbane  3       10640
+                  South Brisbane  4       27098
+                  Stavern 1       54701
+                  Stavern 4       61897
+                  Strasbourg      2       80438
+                  Torino  3       94117
+                  Toulouse        1       15139
+                  Toulouse        3       17251
+                  Toulouse        4       38098
+                  Tsawassen       2       31302
+                  Tsawassen       3       43332
+                  Vancouver       4       75238
+                  Versailles      1       5759
+                  Versailles      4       59074
+                  White Plains    4       85555
+                  Time taken: 30.511 seconds, Fetched: 182 row(s)
+
+
+
+
+h. Find a month for each year in which maximum number of quantities were sold
