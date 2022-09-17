@@ -173,6 +173,30 @@ d. In which quarter sales was minimum
 
 e. In which country sales was maximum and in which country sales was minimum
 
+maximum ---->
+          select country ,cast(sum(sales) as int) as total_sales
+          from sales_order_orc
+          group by country
+          order by total_sales desc
+          limit 1;
+
+          country total_sales
+          USA     3627982
+          Time taken: 55.347 seconds, Fetched: 1 row(s)
+
+minimum ---->
+          select country ,cast(sum(sales) as int) as total_sales
+          from sales_order_orc
+          group by country
+          order by total_sales
+          limit 1;
+
+          country total_sales
+          Ireland 57756
+          Time taken: 52.204 seconds, Fetched: 1 row(s)
+
+
+
 
 f. Calculate quartelry sales for each city
                   hive> select city,
