@@ -394,3 +394,22 @@ f. Calculate quartelry sales for each city
 
 
 h. Find a month for each year in which maximum number of quantities were sold
+
+---->
+          hive> with cte as
+              > (select year_id,month_id,
+              > sum(quantityordered) as quantity_ordered
+              > from sales_order_orc
+              > group by year_id,month_id)
+              >
+              > select * from (select * ,
+              > rank() over(partition by year_id order by (cte.quantity_ordered) desc,month_id) as RANKING
+              > from cte) as x
+              > where x.ranking=1;
+
+          x.year_id       x.month_id      x.quantity_ordered      x.ranking
+          2003    11      10179   1
+          2004    11      10678   1
+          2005    5       4357    1
+          Time taken: 137.138 seconds, Fetched: 3 row(s)
+
