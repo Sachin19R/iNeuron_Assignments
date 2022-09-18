@@ -1,0 +1,152 @@
+This is a real time dataset of the ineuron technical consultant team. You have to perform hive analysis on this given dataset.
+
+Download Dataset 1 - https://drive.google.com/file/d/1WrG-9qv6atP-W3P_-gYln1hHyFKRKMHP/view
+
+Download Dataset 2 - https://drive.google.com/file/d/1-JIPCZ34dyN6k9CqJa-Y8yxIGq6vTVXU/view
+
+Note: both files are csv files. 
+
+
+1. Create a schema based on the given dataset
+
+a). Schema for AgentLogingReport
+
+hive> create table Agent_Loging_Report
+    > (
+    > Sr_No int,
+    > Agent string,
+    > Date string,
+    > Login_Time string,
+    > Logout_Time string,
+    > Duration string
+    > )
+    > row format delimited
+    > fields terminated by ','
+    > tblproperties("skip.header.line.count" = "1");
+OK
+Time taken: 0.113 seconds
+
+b). Schema for AgentPerformance
+
+hive> create table Agent_Performance
+    > (
+    > Sr_NO int,
+    > Date string,
+    > Agent_Name string,
+    > Total_Chats int,
+    > Avg_Response_Time string,
+    > Avg_Resolution_Time String,
+    > Avg_Rating float,
+    > Total_Feedback int
+    > )
+    > row format delimited
+    > fields terminated by ','
+    > tblproperties("skip.header.line.count" = "1")
+    > ;
+OK
+Time taken: 0.796 seconds
+
+
+2. Dump the data inside the hdfs in the given schema location.
+
+a). Loading data into agent_loging_report table
+
+hive> load data local inpath 'data/AgentLogingReport.csv' into table Agent_Loging_Report;
+Loading data to table hive_project.agent_loging_report
+Table hive_project.agent_loging_report stats: [numFiles=1, totalSize=55351]
+OK
+Time taken: 0.773 seconds
+
+b). Loading data into agent_loging_report table
+
+hive> load data local inpath 'data/AgentPerformance.csv' into table Agent_Performance;
+Loading data to table hive_project.agent_performance
+Table hive_project.agent_performance stats: [numFiles=1, totalSize=109853]
+OK
+Time taken: 0.504 seconds
+
+
+3. List of all agents' names. 
+
+hive> select distinct(agent_name) from agent_performance;
+
+
+4. Find out agent average rating.
+
+hive> select agent_name,avg(avg_rating) as Overall_rating
+    > from agent_performance
+    > group by agent_name;
+
+5. Total working days for each agents 
+
+hive> select x.agent,sum(x.date) as total_woring_days
+    > from (
+    > select agent,count(distinct(date)) as date
+    > from agent_loging_report
+    > group by agent,date) as x
+    > group by x.agent;
+
+6. Total query that each agent have taken 
+
+hive> select agent_name,sum(total_chats) as total_queries_taken
+    > from agent_performance
+    > group by agent_name;
+
+
+7. Total Feedback that each agent have received 
+
+hive> select agent_name,sum(total_feedback) as total_feedback
+    > from agent_performance
+    > group by agent_name;
+
+8. Agent name who have average rating between 3.5 to 4 
+
+hive> select x.agent_name
+    > from (
+    > select agent_name,avg(avg_rating) as Overall_rating
+    > from agent_performance
+    > group by agent_name) as x
+    > where x.overall_rating between 3.5 and 4;
+
+9. Agent name who have rating less than 3.5 
+
+hive> select x.agent_name
+    > from (
+    > select agent_name,avg(avg_rating) as Overall_rating
+    > from agent_performance
+    > group by agent_name) as x
+    > where x.overall_rating < 3.5;
+
+10. Agent name who have rating more than 4.5 
+
+hive> select x.agent_name
+    > from (
+    > select agent_name,avg(avg_rating) as Overall_rating
+    > from agent_performance
+    > group by agent_name) as x
+    > where x.overall_rating > 4.5;
+
+11. How many feedback agents have received more than 4.5 average
+
+hive> select agent_name , sum(total_feedback) as total_feedback
+    > from agent_performance
+    > where avg_rating > 4.5
+    > group by agent_name;
+
+12. average weekly response time for each agent 
+
+
+13. average weekly resolution time for each agents 
+
+
+14. Find the number of chat on which they have received a feedback
+
+hive> select agent_name,
+    > sum(total_chats) as queries_attended,
+    > sum(total_feedback) as feedback_recived
+    > from agent_performance
+    > group by agent_name;
+
+15. Total contribution hour for each and every agents weekly basisT 
+16. Perform inner join, left join and right join based on the agent column and after joining the table export that data into your local system.
+17. Perform partitioning on top of the agent column and then on top of that perform bucketing for each partitioning.
