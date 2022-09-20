@@ -135,8 +135,111 @@ hive> select agent_name , sum(total_feedback) as total_feedback
 
 12. average weekly response time for each agent 
 
+#the data in the date column is not peristent and also not in std YYYY-MM-DD format so to clean it i am using PYTHON UDF.
+
+[cloudera@quickstart ~]$ cat data/date_transform.py
+import sys
+
+for line in sys.stdin:
+    line = line.strip("\n\r")
+    date, name , response_time,resolution_time=line.split('\t')
+    mm, dd, yy = date.split('/')
+    if len(mm) == 1:
+        mm='0'+mm
+    if len(dd) == 1:
+        dd='0'+dd
+    date1='-'.join([yy,mm,dd])
+    result='\t'.join([date1,name,response_time,resolution_time])
+    print(result)
+    
+    
+#Adding pyhton file in hive
+   
+hive> add file data/date_transform.py;
+Added resources: [data/date_transform.py]
+
+#creating new transformed table
+
+hive> create table agent_performance_transformed as
+    > select transform(date,agent_name,avg_response_time,avg_resolution_time)
+    > using 'python date_transform.py'
+    > as (date date,agent_name string,avg_response_time string,avg_resolution_time string)
+    > from agent_performance;
+    
+#average weekly response time for each agent
+
+hive> with cte as
+    > (
+    > select date , agent_name , avg_response_time ,
+    > (hour(avg_response_time)*3600)+(minute(avg_response_time)*60)+(second(avg_response_time)) as time_in_secs ,
+    > case when day(date) < 8 then 'WEEK_1'
+    > when day(date) < 15 then 'WEEK_2'
+    > when day(date) < 22 then 'WEEK_3'
+    > when day(date) < 29 then 'WEEK_4'
+    > when day(date) > 28 then 'WEEK_5'
+    > end as week
+    > from agent_performance_transformed
+    > )
+    >
+    > select x.agent_name,x.week,
+    > concat(cast(seconds/60 as int),' MIN ' , seconds%60,' SECs') as weekly_avg_response_time
+    > from
+    > (
+    > select cte.agent_name,cte.week,
+    > cast(avg(cte.time_in_secs) as int) as seconds
+    > from cte
+    > group by cte.agent_name,cte.week
+    > ) as x;
+
+#sample output---->
+
+x.agent_name    x.week  weekly_avg_response_time
+Aditya Shinde   WEEK_1  0 MIN 54 SECs
+Aditya Shinde   WEEK_2  0 MIN 53 SECs
+Aditya Shinde   WEEK_3  0 MIN 19 SECs
+Aditya Shinde   WEEK_4  0 MIN 0 SECs
+Aditya Shinde   WEEK_5  0 MIN 0 SECs
+
+
 
 13. average weekly resolution time for each agents 
+
+hive> with cte as
+    > (
+    > select date , agent_name , avg_resolution_time ,
+    > (hour(avg_resolution_time)*3600)+(minute(avg_resolution_time)*60)+(second(avg_resolution_time)) as time_in_secs ,
+    > case when day(date) < 8 then 'WEEK_1'
+    > when day(date) < 15 then 'WEEK_2'
+    > when day(date) < 22 then 'WEEK_3'
+    > when day(date) < 29 then 'WEEK_4'
+    > when day(date) > 28 then 'WEEK_5'
+    > end as week
+    > from agent_performance_transformed
+    > )
+    >
+    > select x.agent_name,x.week,
+    > concat(cast(seconds/60 as int),' MIN ' , seconds%60,' SECs') as weekly_avg_resolution_time
+    > from
+    > (
+    > select cte.agent_name,cte.week,
+    > cast(avg(cte.time_in_secs) as int) as seconds
+    > from cte
+    > group by cte.agent_name,cte.week
+    > ) as x;
+
+#sample output
+
+x.agent_name    x.week  weekly_avg_resolution_time
+Aditya Shinde   WEEK_1  15 MIN 38 SECs
+Aditya Shinde   WEEK_2  18 MIN 30 SECs
+Aditya Shinde   WEEK_3  10 MIN 10 SECs
+Aditya Shinde   WEEK_4  0 MIN 0 SECs
+Aditya Shinde   WEEK_5  0 MIN 0 SECs
+Aditya_iot      WEEK_1  3 MIN 37 SECs
+Aditya_iot      WEEK_2  13 MIN 11 SECs
+Aditya_iot      WEEK_3  11 MIN 40 SECs
+Aditya_iot      WEEK_4  11 MIN 42 SECs
+Aditya_iot      WEEK_5  6 MIN 41 SECs
 
 
 14. Find the number of chat on which they have received a feedback
@@ -148,5 +251,36 @@ hive> select agent_name,
     > group by agent_name;
 
 15. Total contribution hour for each and every agents weekly basisT 
+
+hive> select t1.agent,t1.week,
+    > concat(sum(hour(t1.duration)) + cast(sum(minute(t1.duration))/60 as int),
+    > ' Hrs ', sum(minute(t1.duration))%60, ' MIN') as clocked_hours
+    > from
+    > (
+    > select agent , date, duration,
+    > case when substr(date,0,2) < 8 then 'WEEK_1'
+    > when substr(date,0,2) < 15 then 'WEEK_2'
+    > when substr(date,0,2) < 22 then 'WEEK_3'
+    > when substr(date,0,2) < 29 then 'WEEK_4'
+    > when substr(date,0,2) > 28 then 'WEEK_5'
+    > end as week
+    > from agent_loging_report
+    > ) as t1
+    > group by t1.agent,t1.week;
+
+
+#SAMPLE O/P
+
+t1.agent        t1.week clocked_hours
+Aditya Shinde   WEEK_4  0 Hrs 2 MIN
+Aditya_iot      WEEK_3  4 Hrs 7 MIN
+Aditya_iot      WEEK_4  9 Hrs 20 MIN
+Aditya_iot      WEEK_5  2 Hrs 12 MIN
+Amersh  WEEK_4  3 Hrs 1 MIN
+Ameya Jain      WEEK_3  11 Hrs 12 MIN
+Ameya Jain      WEEK_4  30 Hrs 47 MIN
+Ankitjha        WEEK_4  2 Hrs 14 MIN
+
+
 16. Perform inner join, left join and right join based on the agent column and after joining the table export that data into your local system.
 17. Perform partitioning on top of the agent column and then on top of that perform bucketing for each partitioning.
